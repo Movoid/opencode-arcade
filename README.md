@@ -1,12 +1,12 @@
 # OpenCode Arcade
 
-一个纯本地 OpenCode V2 TUI 插件，包含**扫雷**和**贪吃蛇**。不调用模型、不发送网络请求、不更改聊天内容。
+一个 OpenCode V2 TUI 游戏插件，包含**扫雷**、**贪吃蛇**和**AI 五子棋**。扫雷、贪吃蛇纯本地运行；五子棋调用你选择的 OpenCode 模型，会消耗该模型的额度。
 
-使用 OpenCode 原生居中弹窗，背景保留原页面，不切换页面路由。两款游戏使用同一套弹窗和当前主题的语义配色，没有固定 RGB 色值。
+使用 OpenCode 原生居中弹窗，背景保留原页面，不切换页面路由。三款游戏使用同一套弹窗和当前主题的语义配色，没有固定 RGB 色值，不向原聊天追加游戏消息。
 
 ## 安装
 
-适用于 OpenCode **V2 TUI**；真实交互验证版本为 **2.2.4**。不适用于 V1。
+适用于 OpenCode **V2 TUI**；AI 五子棋真实交互验证版本为 **2.2.5**。不适用于 V1。
 
 克隆源码，并在用户的全局配置目录创建自动发现入口；**不在当前项目创建 `.plugin` 或 `.opencode` 目录**：
 
@@ -15,18 +15,21 @@ git clone https://github.com/Movoid/opencode-arcade.git "$HOME/.local/share/open
 mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins/arcade"
 printf 'export { default } from "%s/tui"\n' "$HOME/.local/share/opencode-arcade" \
   > "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins/arcade/tui.ts"
+printf 'export { default } from "%s/server"\n' "$HOME/.local/share/opencode-arcade" \
+  > "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins/arcade/server.ts"
 ```
 
-如果目标源码目录或 `plugins/arcade/tui.ts` 已存在，请先检查现有安装，不要覆盖另一份插件。全局入口引用克隆目录，请保留源码目录。OpenCode 在运行时提供 TUI SDK，无需为这种本地加载方式安装额外依赖，也无需修改 `cli.json`。
+如果目标源码目录或两个入口文件已存在，请先检查现有安装，不要覆盖另一份插件。旧版用户需要补充 `server.ts` 才能调用五子棋模型。全局入口引用克隆目录，请保留源码目录。OpenCode 在运行时提供插件 SDK，无需为这种本地加载方式安装额外依赖，也无需修改 `cli.json`。
 
 加载方式参考 [OpenCode V2 官方文档](https://opencode.ai/v2/docs/cli/plugins)。
 
 ## 开始
 
-- `/arcade`：打开游戏库，方向键选择，Enter 打开；也可按 1 进入扫雷、2 进入贪吃蛇。
+- `/arcade`：打开游戏库，方向键选择，Enter 打开；也可按 1 进入扫雷、2 进入贪吃蛇、3 进入五子棋。
 - `/minesweeper` 或 `/mines`：直接打开扫雷。
 - `/snake`：直接打开贪吃蛇。
-- `Ctrl+P` 搜索 `Arcade`、`Minesweeper` 或 `Snake` 也能打开。
+- `/gomoku`：直接打开 AI 五子棋。
+- `Ctrl+P` 搜索 `Arcade`、`Minesweeper`、`Snake` 或 `Gomoku` 也能打开。
 
 若当前界面尚未发现新入口，执行 `/reload`，不需要重启。原扫雷入口已合并到 Arcade，不会重复加载两份插件。
 
@@ -42,7 +45,7 @@ printf 'export { default } from "%s/tui"\n' "$HOME/.local/share/opencode-arcade"
 
 - 弹窗从原先 medium 加大到 **large**（OpenCode 2.2.4 下为 88 列），保持背景可见，不变成全屏。
 - 高度随游戏调整，终端空间不足时缩小。已验证 112×34、96×30、80×24。
-- 两款游戏各自保留当前局，切换游戏或关闭弹窗不会重新开局。
+- 三款游戏各自保留当前局，切换游戏或关闭弹窗不会重新开局。
 - 退出 OpenCode 或代码热重载会重置游戏；没有磁盘存档，贪吃蛇的最佳分数也只保留在当前插件实例中。
 
 ## 扫雷
@@ -78,6 +81,38 @@ printf 'export { default } from "%s/tui"\n' "$HOME/.local/share/opencode-arcade"
 - **关闭弹窗或切回游戏库自动暂停**，重新打开后按 Enter 继续，不会在看不见时继续移动。
 - 进行中缩小终端导致棋盘放不下，会自动暂停并隐藏棋盘，避免部分棋盘不可见却仍然运行。放大终端保留当前局，或按 R 按新尺寸重开。
 
+## AI 五子棋
+
+只有人机模式：15×15 棋盘，横、竖、斜连续五颗及以上获胜，无禁手、无专业棋力评估。AI 通过 `gomoku_move` 工具落子，不由本地算法代下。
+
+| 操作 | 按键 |
+| --- | --- |
+| 移动光标 | 方向键、W/A/D、H/J/K/L |
+| 落子 | Enter / Space，或鼠标左键 |
+| 选择对手模型 | M，原生可搜索模型列表 |
+| 重开 / 交换黑白并重开 | R / X |
+| 重试对手回合 / 停止思考 | T / S |
+
+- 默认采用打开游戏时 TUI 选择的模型。游戏内换模型不会改变编程会话的模型。
+- 使用 OpenCode 已配置的提供商，不另填 API Key。需要支持工具调用的聊天模型；明确标为非聊天的模型不参与选择。
+- 隔离环境读取全局配置，不复制项目配置或凭据文件。因此仅存在于当前项目、或依赖第三方服务端插件注册的模型不在保证范围；不可用时直接报错，不回退到其他模型。
+- 打开游戏、换模型、重新打开棋盘不会发起模型请求。人类落子、让 AI 执黑开新局、按 T 才会请求。
+- 关闭弹窗、返回游戏库、换模型或重开会取消当前回合；旧请求不会在新局补落。请求已发送后，取消不能保证提供商不计费。
+- 不自动重试；模型未落子、位置非法或请求失败时，按 T 重试或 M 换模型。每回合最多一次主请求，不再花一次请求让模型总结「完成」。
+
+### 工具与上下文隔离
+
+参考 permission-reviewer 的 [#52](https://github.com/warc0s/opencode-permission-reviewer/issues/52) / [#73](https://github.com/warc0s/opencode-permission-reviewer/issues/73)：
+
+- 一个后端实例只创建一个棋手 session 和一个隔离 Location。连续回合、新局、交换黑白、重试、换模型、关闭后重开都复用同一 session，不再逐回合创建、删除，也不会在请求失败后自动分配替代 session。
+- 回合串行执行；取消后等待提示输入完成接收，再中断并确认宿主执行已空闲，才把 session 交给下一回合。无法确认空闲时拒绝继续，避免串局；被中断的旧工具执行也不能替下一回合落子。
+- session 的复用范围是当前后端实例：重载服务端插件或重启 OpenCode 后会创建新的隔离环境和棋手 session。目前不跨实例寻找旧 session，也不迁移、清理旧版本留下的会话。会话中的消息/事件仍由 OpenCode 存储，复用不等于数据库大小不再增长。
+- 隔离配置禁用第三方插件、配置 MCP 加载器和自动 warming；保留宿主内置插件和独立引导。引导还会移除插件注入的 MCP，并在请求前检查 MCP 清单为空。
+- 工具注册和最终请求都只保留 `gomoku_move`；额外的执行守卫和会话权限拒绝其他工具。不是仅把 bash/edit 标为「需要批准」却照样发送描述。
+- 替换编程系统提示和聊天历史，仅发送棋手指令、当前棋盘与落子记录。第三方压缩/HTTP 插件也不会向棋手追加指令。
+- 不影响正常编程 Location 的 MCP、工具或插件；不读取服务注册凭据来另建连接，直接使用 TUI 已有客户端激活隔离 Location。
+- 临时目录只保存无凭据的隔离引导和插件启停配置。宿主会缓存 Location，因此不在回合结束时删除引导目录。插件重载会创建新目录；这不是操作系统沙箱或针对恶意插件的安全边界。
+
 ## 文件与验证
 
 - `tui.tsx`：插件入口、游戏库、统一命令。
@@ -86,6 +121,10 @@ printf 'export { default } from "%s/tui"\n' "$HOME/.local/share/opencode-arcade"
 - `appearance.ts` / `appearance.test.ts`：格子显示和隐藏信息不泄漏的回归测试。
 - `snake-view.tsx` / `snake.ts`：贪吃蛇界面与纯规则。
 - `game.test.ts` / `snake.test.ts`：两款游戏的规则测试。
+- `gomoku.ts` / `gomoku-view.tsx`：五子棋规则与 TUI。
+- `gomoku-backend.ts` / `gomoku-isolation.ts`：隔离环境、共享棋手 session、回合串行与取消。
+- `server.ts` / `rpc.ts` / `gomoku-contract.ts`：服务端入口及 TUI RPC 契约。
+- `gomoku.test.ts` / `gomoku-backend.test.ts`：规则、工具白名单、MCP 排除、会话复用及取消回归。
 
 ```sh
 cd "$HOME/.local/share/opencode-arcade"
@@ -94,8 +133,14 @@ bun test
 
 测试覆盖扫雷的 500 个固定种子棋盘、未翻开格子的显示隔离，以及贪吃蛇移动、四边穿越、穿越后吃食物与身体/尾部碰撞、反复绕圈、成长、食物位置、转向队列、碰撞、暂停、胜利和 100 个固定种子的随机操作。
 
-`bun test`：**27 项通过，0 项失败**。
+五子棋测试还覆盖四方向胜利、长连、边界、和棋、非法记录、100 个回合/新局/换模型只创建一次 session、配置/插件 MCP 排除、原生工具拒绝、重复或迟到落子，以及创建/输入接收/等待空闲期间的取消、失败后重试、并发串行和不确定状态拒绝复用。
+
+`bun test`：**43 项通过，0 项失败**。
 
 此前的真实加载与交互验证使用 OpenCode **2.2.4** 的独立 PTY：全局 `/arcade` 与 `/snake` 入口、游戏切换、扫雷翻格/插旗、80×24 困难模式最后一格、贪吃蛇移动/暂停、关闭后重新打开保留棋盘，以及小窗口适配。默认深色和 `tokyonight` 浅色主题均做了截图检查；浅色测试只用测试进程内联配置，未修改用户主题设置。新增穿越规则的验证见上述自动化测试。
 
-不向模型发送请求；后台 agent 同时运行的场景未发起实际模型请求验证。
+AI 五子棋使用 OpenCode **2.2.5** 与本地模拟 OpenAI-compatible 提供商做真实 TUI→RPC→隔离会话→工具落子的验证，包括连续回合、TUI 模型选择、取消后不补落、手动重试、AI 执黑先手与 80×24 滚动。最终测试的 5 个请求对应两次正常落子、一次取消、一次手动重试和一次 AI 先手，没有额外的完成总结请求。请求记录只输出工具名、消息角色及长度等测试元数据：工具列表均为 `["gomoku_move"]`。未调用付费模型，也未验证任何具体模型的棋力。后台 agent 同时运行的场景未发起实际模型请求验证。
+
+session 复用更新另做了真实 TUI 回归：连续回合、R 新局、X 换边和取消后 T 重试均能继续落子；本地模拟提供商仅额外记录非敏感的 `x-opencode-session-id`，确认这些请求使用相同 session ID。取消回合的迟到位置未落入棋盘，后续重试正常；请求仍只含棋手系统提示、当前棋盘和 `gomoku_move`，不累加发送旧回合聊天。
+
+落子后的收尾不再通过抛错阻止额外请求，而是暂停后续请求派发，由后端中断并等待宿主空闲，不屏蔽其他失败通知。此修复另用 OpenCode **2.2.5** 验证连续落子、新局、取消及重试：6 次模拟提供商请求对应 5 次有效落子和 1 次取消，全程同一 session，只提供 `gomoku_move`，没有完成总结请求；同时订阅宿主生命周期事件，记录 6 次 `session.execution.interrupted`、0 次 `session.execution.failed`。取消请求的迟到位置没有落入棋盘。

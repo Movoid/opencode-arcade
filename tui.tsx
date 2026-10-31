@@ -3,8 +3,9 @@ import { createMemo, createSignal, For, Match, Switch } from "solid-js"
 import { ArcadeFrame } from "./frame"
 import { createMinesweeper } from "./minesweeper"
 import { createSnake } from "./snake-view"
+import { createGomoku } from "./gomoku-view"
 
-type Screen = "menu" | "minesweeper" | "snake"
+type Screen = "menu" | "minesweeper" | "snake" | "gomoku"
 
 export default Plugin.define({
   id: "moonvoid.arcade",
@@ -15,6 +16,8 @@ export default Plugin.define({
     const menu = () => setScreen("menu")
     const Minesweeper = createMinesweeper(context, close, menu)
     const Snake = createSnake(context, close, menu)
+    const gomoku = createGomoku(context, close, menu, () => open("gomoku"))
+    const Gomoku = gomoku.Board
 
     function Menu() {
       const theme = createMemo(() => context.theme.surface("dialog"))
@@ -22,21 +25,23 @@ export default Plugin.define({
       const games = [
         { title: "扫雷", subtitle: "Minesweeper", description: "翻开格子，避开地雷。没有提示功能。", screen: "minesweeper" },
         { title: "贪吃蛇", subtitle: "Snake", description: "吃掉食物，穿越边界，不要咬到自己。", screen: "snake" },
+        { title: "五子棋", subtitle: "Gomoku · AI", description: "邀请 OpenCode 模型下棋。会消耗模型额度。", screen: "gomoku" },
       ] as const
       const commands = [
-        { id: "up", bind: "up,w,k", run: () => setSelected(0) },
-        { id: "down", bind: "down,s,j", run: () => setSelected(1) },
+        { id: "up", bind: "up,w,k", run: () => setSelected((i) => (i + games.length - 1) % games.length) },
+        { id: "down", bind: "down,s,j", run: () => setSelected((i) => (i + 1) % games.length) },
         { id: "open", bind: "return,space", run: () => setScreen(games[selected()].screen) },
         { id: "mines", bind: "1", run: () => setScreen("minesweeper") },
         { id: "snake", bind: "2", run: () => setScreen("snake") },
+        { id: "gomoku", bind: "3", run: () => setScreen("gomoku") },
         { id: "close", bind: "escape,q", run: close },
       ].map((c) => ({ ...c, id: `moonvoid.arcade.menu.${c.id}` }))
       context.keymap.layer(() => ({ mode: "modal", priority: 100, commands, bindings: commands.map((c) => c.id) }))
       return (
-        <ArcadeFrame title="Arcade" subtitle="小游戏" height={16} onClose={close}
-          status="纯本地 · 不调用模型 · 不影响后台任务"
+        <ArcadeFrame title="Arcade" subtitle="小游戏" height={19} onClose={close}
+          status="扫雷 / 贪吃蛇纯本地 · 五子棋调用所选模型"
           footer={<>
-            <text height={1} fg={theme().text.muted}>↑↓ 选择  enter 打开  1 扫雷  2 贪吃蛇</text>
+            <text height={1} fg={theme().text.muted}>↑↓ 选择 enter 打开  1 扫雷  2 贪吃蛇  3 五子棋</text>
             <text height={1} fg={theme().text.muted}>esc/q 关闭  ·  游戏内按 b 回到这里</text>
           </>}>
           <box flexDirection="column" flexGrow={1} justifyContent="center" gap={1}>
@@ -62,6 +67,7 @@ export default Plugin.define({
           <Match when={screen() === "menu"}><Menu /></Match>
           <Match when={screen() === "minesweeper"}><Minesweeper /></Match>
           <Match when={screen() === "snake"}><Snake /></Match>
+          <Match when={screen() === "gomoku"}><Gomoku /></Match>
         </Switch>
       ), () => { dialogOpen = false })
       context.ui.dialog.set({ size: "large", centered: true })
@@ -73,8 +79,9 @@ export default Plugin.define({
         { id: "moonvoid.arcade.open", title: "Arcade · 游戏库", group: "Arcade", palette: true, slash: { name: "arcade" }, run: () => open("menu") },
         { id: "moonvoid.arcade.minesweeper.open", title: "Minesweeper · 扫雷", group: "Arcade", palette: true, slash: { name: "minesweeper", aliases: ["mines"] }, run: () => open("minesweeper") },
         { id: "moonvoid.arcade.snake.open", title: "Snake · 贪吃蛇", group: "Arcade", palette: true, slash: { name: "snake" }, run: () => open("snake") },
+        { id: "moonvoid.arcade.gomoku.open", title: "Gomoku · 与模型下五子棋", group: "Arcade", palette: true, slash: { name: "gomoku" }, run: () => open("gomoku") },
       ],
     }))
-    return close
+    return () => { gomoku.dispose(); close() }
   },
 })
