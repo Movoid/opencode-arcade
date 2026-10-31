@@ -1,0 +1,13 @@
+{
+  "name": "opencode-arcade",
+  "version": "0.2.0",
+  "description": "Theme-aware Snake and Minesweeper games in native OpenCode V2 TUI dialogs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Movoid/opencode-arcade.git"
+  },
+  "private": true,
+  "type": "module",
+  "exports": { "./tui": "./tui.tsx" },
+  "scripts": { "test": "bun test" }
+}

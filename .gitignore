@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env*
+.plugin/
+.opencode/
+
+# Local QA screenshots can include the desktop/session behind the game.
+/preview*.png
